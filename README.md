@@ -1,9 +1,5 @@
 # FPGA lab projects (Nexys-A7, VHDL)
 
-English translation of two lab assignments. Signal, button and switch names are kept exactly as in the originals.
-
-
----
 
 ## proj3: LED display control
 
