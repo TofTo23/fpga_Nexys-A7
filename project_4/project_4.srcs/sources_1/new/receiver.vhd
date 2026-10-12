@@ -14,7 +14,6 @@
 -- Zasada dzialania: po wykryciu '0' na linii odbiornik odczekuje pol bitu
 -- (srodek bitu startu), a nastepnie co jeden okres bitu probkuje linie:
 -- 8 razy dane (D0 jako pierwszy) i raz bit stopu. Probkowanie w srodku bitu
--- daje zapas ok. +/-0,5 bitu na 9,5 bitu ramki, czyli tolerancje ok. +/-5%.
 ----------------------------------------------------------------------------------
 
 library IEEE;
@@ -31,7 +30,7 @@ end receiver;
 
 architecture Behavioral of receiver is
 
-    -- liczba taktow zegara na jeden bit (z zaokragleniem): 100 MHz / 9600 = 10417
+    -- liczba taktow zegara na jeden bit 100 MHz / 9600 = 10417
     constant BIT_TIME  : integer := (clk_freq + baud / 2) / baud;
     constant HALF_TIME : integer := BIT_TIME / 2;
 
@@ -46,7 +45,6 @@ architecture Behavioral of receiver is
     signal shreg  : std_logic_vector (7 downto 0) := (others => '0');
 
 begin
-
     -- synchronizacja asynchronicznego wejscia rxd_i z zegarem clk_i
     process (clk_i, rst_i)
     begin

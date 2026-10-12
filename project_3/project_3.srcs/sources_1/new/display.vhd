@@ -52,7 +52,6 @@ begin
             else
                 cnt <= cnt + 1;
             end if;
-
             -- multiplekser: wybor anody i odpowiadajacych jej segmentow
             case sel is
                 when 0 =>
@@ -68,7 +67,6 @@ begin
                     led7_an_o  <= "0111";
                     led7_seg_o <= digit_i(31 downto 24);
             end case;
-
         end if;
     end process;
 
