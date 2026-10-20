@@ -30,7 +30,7 @@ architecture Behavioral of top is
     -- dekoder: cyfra hex -> segmenty ABCDEFG + DP (aktywne '0')
     function hex2seg (hex : std_logic_vector (3 downto 0)) return std_logic_vector is
     begin
-        case hex is             --  ABCDEFGP
+        case hex is             
             when "0000" => return "00000011";   -- 0
             when "0001" => return "10011111";   -- 1
             when "0010" => return "00100101";   -- 2

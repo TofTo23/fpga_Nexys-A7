@@ -24,10 +24,10 @@ end encoder;
 
 architecture Behavioral of encoder is
 
-    -- kod 7-segmentowy cyfry ustawionej na przelacznikach (A B C D E F G)
+    -- kod 7-segmentowy cyfry 
     signal seg : STD_LOGIC_VECTOR (6 downto 0);
 
-    -- pamiec segmentow A..G czterech cyfr; po wlaczeniu cyfry sa wygaszone
+    -- pamiec segmentow 
     signal mem3 : STD_LOGIC_VECTOR (6 downto 0) := "1111111";
     signal mem2 : STD_LOGIC_VECTOR (6 downto 0) := "1111111";
     signal mem1 : STD_LOGIC_VECTOR (6 downto 0) := "1111111";
@@ -38,9 +38,6 @@ architecture Behavioral of encoder is
     signal btn_s2 : STD_LOGIC_VECTOR (3 downto 0) := "0000";
 
 begin
-
-    -- enkoder: cyfra szesnastkowa -> segmenty (aktywne '0')
-    --                    ABCDEFG
     with sw_i(3 downto 0) select
         seg <= "0000001" when "0000",   -- 0
                "1001111" when "0001",   -- 1
@@ -59,7 +56,7 @@ begin
                "0110000" when "1110",   -- E
                "0111000" when others;   -- F
 
-    -- pamiec: wpis cyfry przy wcisnietym przycisku
+    -- wpis cyfry
     process (clk_i)
     begin
         if rising_edge(clk_i) then
@@ -81,7 +78,6 @@ begin
         end if;
     end process;
 
-    -- zlozenie slowa dla bloku display; DP swieci ('0') gdy przelacznik zalaczony
     digit_o <= mem3 & (not sw_i(7)) &
                mem2 & (not sw_i(6)) &
                mem1 & (not sw_i(5)) &

@@ -1,18 +1,5 @@
 ----------------------------------------------------------------------------------
--- Testbench ukladu sterowania wyswietlaczem LED
---
--- Przebieg (czas symulacji: 25 ms):
---   0 ms        SW7..4 = "1010" (kropki AN3 i AN1), SW3..0 = A
---   1 -  2 ms   BTNL wcisniety  -> AN3 = A
---   3 ms        SW3..0 = 5
---   4 -  5 ms   BTNC wcisniety  -> AN2 = 5
---   6 ms        SW3..0 = C
---   7 -  8 ms   BTNR wcisniety  -> AN1 = C
---   9 ms        SW3..0 = 3
---  10 - 11 ms   BTND wcisniety  -> AN0 = 3
---  13 ms        SW7..4 = "0101" (kropki AN2 i AN0)
---  19 ms        SW7..4 = "1100" (kropki AN3 i AN2)
---  25 ms        koniec
+-- 25ms 
 ----------------------------------------------------------------------------------
 
 library IEEE;
