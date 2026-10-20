@@ -1,0 +1,185 @@
+; Licznik/edytor czterech cyfr szesnastkowych dla KCPSM6 (PicoBlaze).
+; Port wejściowy 00: bity 0..4 = zdarzenia BTNL-short, BTNR, BTNU, BTND, BTNL-long.
+; Porty wyjściowe 10..13: cyfry 0..3 (0 = prawa cyfra), niska połówka bajtu.
+; Port 14: bity 1..0 = wybrana cyfra, bit 2 = tryb edycji.
+; Port 20: maska bitów zdarzeń do potwierdzenia.
+
+NAMEREG s0, digit0
+NAMEREG s1, digit1
+NAMEREG s2, digit2
+NAMEREG s3, digit3
+NAMEREG s4, selected
+NAMEREG s5, mode
+NAMEREG s6, events
+NAMEREG s7, ctrl
+
+; Uruchomienie: 0000, tryb wyswietlania, wybrana prawa cyfra.
+start:
+    LOAD digit0, 00
+    LOAD digit1, 00
+    LOAD digit2, 00
+    LOAD digit3, 00
+    LOAD selected, 00
+    LOAD mode, 00
+    OUTPUT digit0, 10
+    OUTPUT digit1, 11
+    OUTPUT digit2, 12
+    OUTPUT digit3, 13
+    CALL write_ctrl
+
+main_loop:
+    INPUT events, 00
+
+    ; Dlugie BTNL: wejscie/wyjscie z trybu edycji.
+    TEST events, 10
+    JUMP Z, scan_left
+    CALL toggle_edit
+
+scan_left:
+    ; Krotkie BTNL: wybor cyfry bardziej w lewo (tylko w trybie edycji).
+    TEST events, 01
+    JUMP Z, scan_right
+    CALL left_short
+
+scan_right:
+    ; BTNR: wybor cyfry bardziej w prawo.
+    TEST events, 02
+    JUMP Z, scan_up
+    CALL right_press
+
+scan_up:
+    ; BTNU: zwiekszenie wybranej cyfry modulo 16.
+    TEST events, 04
+    JUMP Z, scan_down
+    CALL up_press
+
+scan_down:
+    ; BTND: zmniejszenie wybranej cyfry modulo 16.
+    TEST events, 08
+    JUMP Z, acknowledge
+    CALL down_press
+
+acknowledge:
+    ; Potwierdzamy tylko zdarzenia, ktore zostaly odczytane.
+    TEST events, 1F
+    JUMP Z, main_loop
+    OUTPUT events, 20
+    JUMP main_loop
+
+; -----------------------------------------------------------------------------
+; Zmiana trybu. Po wejsciu do edycji aktywna jest prawa cyfra.
+toggle_edit:
+    COMPARE mode, 00
+    JUMP Z, enter_edit
+    LOAD mode, 00
+    CALL write_ctrl
+    RETURN
+enter_edit:
+    LOAD mode, 01
+    LOAD selected, 00
+    CALL write_ctrl
+    RETURN
+
+; Krotkie BTNL przesuwa zaznaczenie w lewo, z zawijaniem 3 -> 0.
+left_short:
+    COMPARE mode, 00
+    JUMP Z, left_done
+    ADD selected, 01
+    COMPARE selected, 04
+    JUMP NZ, left_update
+    LOAD selected, 00
+left_update:
+    CALL write_ctrl
+left_done:
+    RETURN
+
+; BTNR przesuwa zaznaczenie w prawo, z zawijaniem 0 -> 3.
+right_press:
+    COMPARE mode, 00
+    JUMP Z, right_done
+    COMPARE selected, 00
+    JUMP Z, right_wrap
+    SUB selected, 01
+    JUMP right_update
+right_wrap:
+    LOAD selected, 03
+right_update:
+    CALL write_ctrl
+right_done:
+    RETURN
+
+; Zwieksz selected nibble, bez przeniesienia do sasiedniej cyfry.
+up_press:
+    COMPARE mode, 00
+    JUMP Z, up_done
+    COMPARE selected, 00
+    JUMP Z, up_digit0
+    COMPARE selected, 01
+    JUMP Z, up_digit1
+    COMPARE selected, 02
+    JUMP Z, up_digit2
+    JUMP up_digit3
+up_digit0:
+    ADD digit0, 01
+    AND digit0, 0F
+    OUTPUT digit0, 10
+    JUMP up_done
+up_digit1:
+    ADD digit1, 01
+    AND digit1, 0F
+    OUTPUT digit1, 11
+    JUMP up_done
+up_digit2:
+    ADD digit2, 01
+    AND digit2, 0F
+    OUTPUT digit2, 12
+    JUMP up_done
+up_digit3:
+    ADD digit3, 01
+    AND digit3, 0F
+    OUTPUT digit3, 13
+up_done:
+    RETURN
+
+; Zmniejsz selected nibble, F po zmniejszeniu z 0.
+down_press:
+    COMPARE mode, 00
+    JUMP Z, down_done
+    COMPARE selected, 00
+    JUMP Z, down_digit0
+    COMPARE selected, 01
+    JUMP Z, down_digit1
+    COMPARE selected, 02
+    JUMP Z, down_digit2
+    JUMP down_digit3
+down_digit0:
+    SUB digit0, 01
+    AND digit0, 0F
+    OUTPUT digit0, 10
+    JUMP down_done
+down_digit1:
+    SUB digit1, 01
+    AND digit1, 0F
+    OUTPUT digit1, 11
+    JUMP down_done
+down_digit2:
+    SUB digit2, 01
+    AND digit2, 0F
+    OUTPUT digit2, 12
+    JUMP down_done
+down_digit3:
+    SUB digit3, 01
+    AND digit3, 0F
+    OUTPUT digit3, 13
+down_done:
+    RETURN
+
+; Wyslij ustawienia trybu i wybranej cyfry do sprzetowego sterownika.
+write_ctrl:
+    LOAD ctrl, selected
+    COMPARE mode, 00
+    JUMP Z, ctrl_write
+    OR ctrl, 04
+ctrl_write:
+    OUTPUT ctrl, 14
+    RETURN
