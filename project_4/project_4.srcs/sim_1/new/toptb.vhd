@@ -1,14 +1,3 @@
-----------------------------------------------------------------------------------
--- Testbench modulu top (monitor portu RS-232)
---
--- 1. reset na poczatku symulacji
--- 2. trzykrotne wyslanie kodu 01010011 (0x53) z Rys. 1:
---      ramka 1 - predkosc nominalna 9600 bps
---      ramka 2 - predkosc mniejsza o 4%  (9216 bps)
---      ramka 3 - predkosc wieksza o 4%   (9984 bps)
---
-----------------------------------------------------------------------------------
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
@@ -70,14 +59,14 @@ begin
 
         -- ramka 1: predkosc nominalna
         send_byte(TEST_BYTE, T_NOM);
-
+        wait for 3 ms;
         -- ramka 2: predkosc mniejsza o 4%
         send_byte(TEST_BYTE, T_SLOW);
-
+        wait for 3 ms;
         -- ramka 3: predkosc wieksza o 4%
         send_byte(TEST_BYTE, T_FAST);
-
         wait for 3 ms;
+        
         done <= true;
         wait;
     end process;

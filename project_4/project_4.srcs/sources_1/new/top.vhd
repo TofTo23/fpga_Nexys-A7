@@ -1,17 +1,3 @@
-----------------------------------------------------------------------------------
--- Monitor portu RS-232
---
--- Odebrany bajt (9600 bps, 8N1) wyswietlany jest szesnastkowo na dwoch
--- prawych cyfrach wyswietlacza: AN1 = starsza cyfra hex, AN0 = mlodsza.
--- Cyfry AN3 i AN2 sa wygaszone.
---
--- clk_i      - zegar 100 MHz
--- rst_i      - reset asynchroniczny, aktywny '1' (przycisk BTNR)
--- RXD_i      - wejscie danych RS-232
--- led7_an_o  - anody wyswietlacza (aktywne '0')
--- led7_seg_o - segmenty wyswietlacza (aktywne '0'), bit 7 = A, ..., bit 0 = DP
-----------------------------------------------------------------------------------
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 

@@ -1,18 +1,3 @@
-----------------------------------------------------------------------------------
--- Blok sterowania 4-cyfrowym multipleksowanym wyswietlaczem LED
---
--- clk_i      - zegar systemowy (100 MHz)
--- rst_i      - reset asynchroniczny, aktywny '1' (zapala wszystkie segmenty)
--- digit_i    - stan segmentow 4 cyfry po 8bit
---
--- led7_an_o  - anody (aktywne '0')
--- led7_seg_o - segmenty (aktywne '0'), bit 7 = A, ..., bit 1 = G, bit 0 = DP
---
--- clk_div    - wspolczynnik podzialu zegara: co clk_div taktow clk_i
---              wyswietlacz przelacza sie na kolejna cyfre
---              (100 MHz / 100000 = 1 kHz)
-----------------------------------------------------------------------------------
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 

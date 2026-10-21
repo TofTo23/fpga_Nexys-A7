@@ -1,21 +1,3 @@
-----------------------------------------------------------------------------------
--- Odbiornik RS-232: 8 bitow danych, bez parzystosci, 1 bit stopu (8N1)
---
--- clk_i    - zegar systemowy (100 MHz)
--- rst_i    - reset asynchroniczny, aktywny '1'
--- rxd_i    - wejscie szeregowe (stan spoczynkowy '1')
---
--- data_o   - ostatni poprawnie odebrany bajt
--- valid_o  - impuls '1' na jeden takt clk_i po odebraniu poprawnej ramki
---
--- clk_freq - czestotliwosc zegara clk_i [Hz]
--- baud     - szybkosc transmisji [bps]
---
--- Zasada dzialania: po wykryciu '0' na linii odbiornik odczekuje pol bitu
--- (srodek bitu startu), a nastepnie co jeden okres bitu probkuje linie:
--- 8 razy dane (D0 jako pierwszy) i raz bit stopu. Probkowanie w srodku bitu
-----------------------------------------------------------------------------------
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
@@ -34,8 +16,8 @@ architecture Behavioral of receiver is
     constant BIT_TIME  : integer := (clk_freq + baud / 2) / baud;
     constant HALF_TIME : integer := BIT_TIME / 2;
 
-    type state_t is (IDLE, START, DATA, STOP);
-    signal state : state_t := IDLE;
+    type state_t is (LSTN, START, DATA, STOP);
+    signal state : state_t := LSTN;
 
     signal rxd_meta : std_logic := '1';     -- 1. przerzutnik synchronizatora
     signal rxd_sync : std_logic := '1';     -- 2. przerzutnik synchronizatora
@@ -61,7 +43,7 @@ begin
     process (clk_i, rst_i)
     begin
         if rst_i = '1' then
-            state   <= IDLE;
+            state   <= LSTN;
             cnt     <= 0;
             bit_no  <= 0;
             shreg   <= (others => '0');
@@ -69,20 +51,19 @@ begin
         elsif rising_edge(clk_i) then
             case state is
                 -- oczekiwanie na poczatek bitu startu
-                when IDLE =>
+                when LSTN =>
                     cnt    <= 0;
                     bit_no <= 0;
                     if rxd_sync = '0' then
                         state <= START;
                     end if;
-                -- pol bitu pozniej: sprawdzenie, czy to faktycznie bit startu
                 when START =>
                     if cnt = HALF_TIME - 1 then
                         cnt <= 0;
                         if rxd_sync = '0' then
                             state <= DATA;
                         else
-                            state <= IDLE;      -- zaklocenie, nie bit startu
+                            state <= LSTN;
                         end if;
                     else
                         cnt <= cnt + 1;
@@ -106,7 +87,7 @@ begin
                         if rxd_sync = '1' then
                             data_o  <= shreg;
                         end if;
-                        state <= IDLE;
+                        state <= LSTN;
                     else
                         cnt <= cnt + 1;
                     end if;
