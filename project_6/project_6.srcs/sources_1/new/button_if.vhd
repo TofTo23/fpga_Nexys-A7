@@ -133,7 +133,7 @@ begin
                 -- BTNR, BTNU, BTND: jedno zdarzenie na naciœniêcie.
                 for i in 0 to 2 loop
                     if buttons_db(i) = '1' and buttons_q(i) = '0' then
-                        ev(i+1) := '1';
+                        ev(3-i) := '1';
                     end if;
                 end loop;
 

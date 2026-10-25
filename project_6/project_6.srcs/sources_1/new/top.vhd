@@ -131,8 +131,8 @@ begin
     buttons : entity work.button_if
         generic map (
             CLK_HZ        => 100_000_000,
-            DEBOUNCE_MS   => 10,
-            LONG_PRESS_MS => 500
+            DEBOUNCE_MS   => 1, -- USTAW NA 10!!!!!!!!!
+            LONG_PRESS_MS => 10 -- USTAW NA 500
         )
         port map (
             clk_i        => clk_i,
@@ -172,7 +172,7 @@ begin
 
     seven_segment_display : entity work.display
         generic map (
-            clk_div   => 100_000,
+            clk_div   => 100, -- 100_000
             blink_div => 25_000_000
         )
         port map (

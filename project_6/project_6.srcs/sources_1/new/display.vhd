@@ -31,22 +31,22 @@ architecture rtl of display is
     begin
         -- Basys 3: aktywne '0'; kolejnosc bitow DP,G,F,E,D,C,B,A.
         case x is
-            when "0000" => return x"C0"; -- 0
-            when "0001" => return x"F9"; -- 1
-            when "0010" => return x"A4"; -- 2
-            when "0011" => return x"B0"; -- 3
+            when "0000" => return x"03"; -- 0
+            when "0001" => return x"9F"; -- 1
+            when "0010" => return x"25"; -- 2
+            when "0011" => return x"0D"; -- 3
             when "0100" => return x"99"; -- 4
-            when "0101" => return x"92"; -- 5
-            when "0110" => return x"82"; -- 6
-            when "0111" => return x"F8"; -- 7
-            when "1000" => return x"80"; -- 8
-            when "1001" => return x"90"; -- 9
-            when "1010" => return x"88"; -- A
-            when "1011" => return x"83"; -- b
-            when "1100" => return x"C6"; -- C
-            when "1101" => return x"A1"; -- d
-            when "1110" => return x"86"; -- E
-            when others => return x"8E"; -- F
+            when "0101" => return x"49"; -- 5
+            when "0110" => return x"41"; -- 6
+            when "0111" => return x"1F"; -- 7
+            when "1000" => return x"01"; -- 8
+            when "1001" => return x"09"; -- 9
+            when "1010" => return x"11"; -- A
+            when "1011" => return x"C1"; -- b
+            when "1100" => return x"63"; -- C
+            when "1101" => return x"85"; -- d
+            when "1110" => return x"61"; -- E
+            when others => return x"71"; -- F
         end case;
     end function;
 begin
