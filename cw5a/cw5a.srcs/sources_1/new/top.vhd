@@ -13,12 +13,14 @@ end top;
 
 architecture Behavioral of top is
 
+    -- pamiec ROM z ksztaltami znakow (Block Memory Generator)
     component char_mem
         port ( clka  : in  std_logic;
                addra : in  std_logic_vector(11 downto 0);
                douta : out std_logic_vector(7 downto 0));
     end component;
 
+    -- bufor FIFO 64 x 8 bitow (FIFO Generator)
     component fifo_mem
         port ( clk   : in  std_logic;
                din   : in  std_logic_vector(7 downto 0);
@@ -29,8 +31,9 @@ architecture Behavioral of top is
                empty : out std_logic);
     end component;
 
-    constant SEG_OFF : std_logic_vector (7 downto 0) := "11111111";
+    constant SEG_OFF : std_logic_vector (7 downto 0) := "11111111";    -- cyfra wygaszona
 
+    -- dekoder: cyfra hex -> segmenty ABCDEFG + DP (aktywne '0')
     function hex2seg (hex : std_logic_vector (3 downto 0)) return std_logic_vector is
     begin
         case hex is
@@ -59,6 +62,7 @@ architecture Behavioral of top is
     constant SPACE    : std_logic_vector (7 downto 0) := x"20";
     constant STAR     : std_logic_vector (7 downto 0) := x"2A";
 
+    -- odbiornik i wyswietlacz
     signal rx_data  : std_logic_vector (7 downto 0);
     signal rx_valid : std_logic;
     signal digits   : std_logic_vector (31 downto 0);

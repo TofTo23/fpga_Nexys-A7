@@ -1,3 +1,9 @@
+----------------------------------------------------------------------------------
+--   BTNL (btn_i(3)) - wpis czestotliwosci X
+--   BTNC (btn_i(2)) - wpis czestotliwosci Y
+--   BTNR (btn_i(1)) - wpis przesuniecia fazy Y (SW = najstarsze bity fazy)
+--   BTND (btn_i(0)) - wyczyszczenie ekranu i reset generatora DDS
+----------------------------------------------------------------------------------
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
@@ -16,7 +22,7 @@ end top;
 
 architecture Behavioral of top is
 
-    -- pamiec obrazu 384 x 384 x 1 bit
+    -- pamiec obrazu 384 x 384 x 1 bit (Block Memory Generator, Simple Dual Port)
     component video_mem
         port ( clka  : in  std_logic;
                wea   : in  std_logic_vector(0 downto 0);
@@ -27,7 +33,7 @@ architecture Behavioral of top is
                doutb : out std_logic_vector(0 downto 0));
     end component;
 
-    -- generator DDS, 2 kanaly
+    -- generator DDS, 2 kanaly (DDS Compiler)
     component singen
         port ( aclk                            : in  std_logic;
                aclken                          : in  std_logic;
@@ -41,7 +47,7 @@ architecture Behavioral of top is
                event_s_config_tlast_unexpected : out std_logic);
     end component;
 
- 
+    -- stale
     constant SIZE  : integer := 384;                -- bok kwadratu z figura
     constant N_PIX : integer := SIZE * SIZE;        -- 147456 pikseli
     constant HALF  : integer := SIZE / 2;           -- 192
@@ -59,8 +65,7 @@ architecture Behavioral of top is
     constant X0 : integer := (H_VISIBLE - SIZE) / 2;    -- 128: lewa krawedz kwadratu
     constant Y0 : integer := (V_VISIBLE - SIZE) / 2;    -- 48:  gorna krawedz kwadratu
 
-    -- przeskalowanie probki DDS (-1024..1023) do przesuniecia od srodka
-    -- ekranu (-192..191): s * 3 / 16
+    -- przeskalowanie probki DDS
     function scale (s : signed(10 downto 0)) return integer is
         variable p : signed(12 downto 0);
     begin
@@ -68,16 +73,12 @@ architecture Behavioral of top is
         return to_integer(shift_right(p, 4));                   -- / 16
     end function;
 
-    ------------------------------------------------------------------------------
-    -- sygnaly
-    ------------------------------------------------------------------------------
-    -- przelaczniki i przyciski (synchronizacja z zegarem, wykrywanie wcisniecia)
+    -- przelaczniki i przyciski 
     signal sw_meta, sw_sync : std_logic_vector (7 downto 0) := (others => '0');
     signal btn_meta, btn_sync, btn_prev : std_logic_vector (3 downto 0) := (others => '0');
     signal btn_press : std_logic_vector (3 downto 0);
 
-    -- nastawy generatora: wartosci poczatkowe = ustawienia IP
-    -- (0.1953125 MHz -> PINC = 256; faza Y 0.25 * 2pi -> POFF = 0x4000)
+    -- nastawy generatora
     signal pinc_x : std_logic_vector (15 downto 0) := x"0100";
     signal pinc_y : std_logic_vector (15 downto 0) := x"0100";
     signal poff_y : std_logic_vector (15 downto 0) := x"4000";
@@ -90,7 +91,7 @@ architecture Behavioral of top is
     signal dds_valid  : std_logic;
     signal dds_data   : std_logic_vector (15 downto 0);
 
-    -- automat sterujacy
+    -- sterowanie
     type ctrl_t is (RUN, CFG_X, CFG_Y, CLEAR);
     signal state     : ctrl_t := RUN;
     signal after_clr : std_logic := '0';                    -- konfiguracja po czyszczeniu
@@ -120,9 +121,7 @@ architecture Behavioral of top is
 
 begin
 
-    ------------------------------------------------------------------------------
     -- przelaczniki i przyciski
-    ------------------------------------------------------------------------------
     process (clk_i)
     begin
         if rising_edge(clk_i) then
@@ -192,9 +191,7 @@ begin
         end if;
     end process;
 
-    ------------------------------------------------------------------------------
     -- generator DDS
-    ------------------------------------------------------------------------------
     dds : singen
         port map ( aclk                            => clk_i,
                    aclken                          => '1',
@@ -207,9 +204,7 @@ begin
                    event_s_config_tlast_missing    => open,
                    event_s_config_tlast_unexpected => open );
 
-    ------------------------------------------------------------------------------
-    -- rysowanie: probki X i Y przychodza na zmiane (najpierw X)
-    ------------------------------------------------------------------------------
+    -- rysowanie
     process (clk_i)
         variable col, row : integer range 0 to SIZE - 1;
     begin
@@ -234,10 +229,8 @@ begin
             end if;
         end if;
     end process;
-
-    ------------------------------------------------------------------------------
-    -- pamiec obrazu: port A - zapis (rysowanie lub czyszczenie), port B - odczyt (VGA)
-    ------------------------------------------------------------------------------
+    
+    --  port A - zapis , port B - odczyt 
     mem_we(0) <= '1' when state = CLEAR else pix_we;
     mem_din   <= "0" when state = CLEAR else "1";
     mem_wadr  <= std_logic_vector(to_unsigned(clr_addr, 18)) when state = CLEAR
@@ -252,9 +245,7 @@ begin
                    addrb => mem_radr,
                    doutb => mem_dout );
 
-    ------------------------------------------------------------------------------
-    -- VGA 640x480@60Hz: liczniki piksela i linii (25 MHz = co 4 takty)
-    ------------------------------------------------------------------------------
+    -- VGA 
     process (clk_i)
     begin
         if rising_edge(clk_i) then
