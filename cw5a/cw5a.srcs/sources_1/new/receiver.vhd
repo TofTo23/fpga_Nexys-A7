@@ -1,13 +1,3 @@
-----------------------------------------------------------------------------------
--- Odbiornik RS-232: 8 bitow danych, bez parzystosci, 1 bit stopu (8N1)
--- Bez resetu - stan poczatkowy ustalaja wartosci poczatkowe sygnalow.
---
--- clk_i    - zegar systemowy (100 MHz)
--- rxd_i    - wejscie szeregowe (stan spoczynkowy '1')
--- data_o   - ostatni poprawnie odebrany bajt
--- valid_o  - impuls '1' na jeden takt clk_i po odebraniu poprawnej ramki
-----------------------------------------------------------------------------------
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
@@ -29,8 +19,8 @@ architecture Behavioral of receiver is
     type state_t is (IDLE, START, DATA, STOP);
     signal state : state_t := IDLE;
 
-    signal rxd_meta : std_logic := '1';     -- 1. przerzutnik synchronizatora
-    signal rxd_sync : std_logic := '1';     -- 2. przerzutnik synchronizatora
+    signal rxd_meta : std_logic := '1';     -- 1. przerzutnik 
+    signal rxd_sync : std_logic := '1';     -- 2. przerzutnik 
 
     signal cnt    : integer range 0 to BIT_TIME - 1 := 0;   -- licznik czasu bitu
     signal bit_no : integer range 0 to 7 := 0;              -- numer odbieranego bitu
@@ -89,7 +79,7 @@ begin
                         cnt <= cnt + 1;
                     end if;
 
-                -- srodek bitu stopu: ramka poprawna tylko, gdy linia jest w '1'
+                -- srodek bitu stopu
                 when STOP =>
                     if cnt = BIT_TIME - 1 then
                         if rxd_sync = '1' then

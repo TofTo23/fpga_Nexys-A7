@@ -1,14 +1,3 @@
-----------------------------------------------------------------------------------
--- Nadajnik RS-232: 8 bitow danych, bez parzystosci, 1 bit stopu (8N1)
---
--- clk_i    - zegar systemowy (100 MHz)
--- data_i   - bajt do wyslania
--- start_i  - '1' przez jeden takt: rozpocznij wysylanie data_i
---            (brane pod uwage tylko, gdy busy_o = '0')
--- busy_o   - '1' w trakcie wysylania ramki
--- txd_o    - wyjscie szeregowe (stan spoczynkowy '1')
-----------------------------------------------------------------------------------
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
@@ -42,7 +31,7 @@ begin
         if rising_edge(clk_i) then
             if busy = '0' then
                 if start_i = '1' then
-                    shreg  <= '1' & data_i & '0';   -- stop, D7..D0, start
+                    shreg  <= '1' & data_i & '0';   -- stop, start
                     cnt    <= 0;
                     bit_no <= 0;
                     busy   <= '1';
