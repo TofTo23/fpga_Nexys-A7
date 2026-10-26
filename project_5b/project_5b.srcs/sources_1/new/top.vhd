@@ -1,20 +1,3 @@
-----------------------------------------------------------------------------------
--- Generator figur Lissajous (IP Core Generator, wersja 2)
---
--- Generator DDS (IP singen) wytwarza dwie sinusoidy: kanal 1 = X, kanal 2 = Y.
--- Kazda para probek (X, Y) wyznacza punkt, ktory jest zapisywany jako bialy
--- piksel do pamieci obrazu 384 x 384 (IP video_mem). Obraz jest wyswietlany na
--- monitorze VGA 640x480@60Hz (piksel 25 MHz), wycentrowany: kolumny 128..511,
--- wiersze 48..431. Punkt (0,0) jest w srodku kwadratu, X rosnie w prawo,
--- Y rosnie w gore.
---
--- Przelaczniki SW7..SW0 (0..255) i przyciski:
---   BTNL (btn_i(3)) - wpis czestotliwosci X
---   BTNC (btn_i(2)) - wpis czestotliwosci Y
---   BTNR (btn_i(1)) - wpis przesuniecia fazy Y (SW = najstarsze bity fazy)
---   BTND (btn_i(0)) - wyczyszczenie ekranu i reset generatora DDS
--- Bez resetu - stan poczatkowy ustalaja wartosci poczatkowe sygnalow.
-----------------------------------------------------------------------------------
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
@@ -33,7 +16,7 @@ end top;
 
 architecture Behavioral of top is
 
-    -- pamiec obrazu 384 x 384 x 1 bit (Block Memory Generator, Simple Dual Port)
+    -- pamiec obrazu 384 x 384 x 1 bit
     component video_mem
         port ( clka  : in  std_logic;
                wea   : in  std_logic_vector(0 downto 0);
@@ -44,7 +27,7 @@ architecture Behavioral of top is
                doutb : out std_logic_vector(0 downto 0));
     end component;
 
-    -- generator DDS, 2 kanaly (DDS Compiler)
+    -- generator DDS, 2 kanaly
     component singen
         port ( aclk                            : in  std_logic;
                aclken                          : in  std_logic;
@@ -58,9 +41,7 @@ architecture Behavioral of top is
                event_s_config_tlast_unexpected : out std_logic);
     end component;
 
-    ------------------------------------------------------------------------------
-    -- stale
-    ------------------------------------------------------------------------------
+ 
     constant SIZE  : integer := 384;                -- bok kwadratu z figura
     constant N_PIX : integer := SIZE * SIZE;        -- 147456 pikseli
     constant HALF  : integer := SIZE / 2;           -- 192

@@ -8,13 +8,13 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 entity button_if is
     generic (
-        CLK_HZ          : positive := 100_000_000;
-        DEBOUNCE_MS     : positive := 10;
-        LONG_PRESS_MS   : positive := 500
+        CLK_HZ        : positive := 100_000_000;
+        DEBOUNCE_MS   : positive := 10;
+        LONG_PRESS_MS : positive := 500
     );
     port (
         clk_i        : in  std_logic;
-        rst_i        : in  std_logic; -- aktywny '1'
+        rst_i        : in  std_logic;
         button_i     : in  std_logic_vector(3 downto 0);
         clear_mask_i : in  std_logic_vector(4 downto 0);
         events_o     : out std_logic_vector(4 downto 0)
@@ -22,9 +22,12 @@ entity button_if is
 end button_if;
 
 architecture rtl of button_if is
+
     constant SAMPLE_DIV : positive := CLK_HZ / 1000;
 
-    type debounce_array_t is array (3 downto 0) of integer range 0 to DEBOUNCE_MS-1;
+    type debounce_array_t is
+        array (3 downto 0) of integer range 0 to DEBOUNCE_MS-1;
+
     signal db_count : debounce_array_t := (others => 0);
 
     signal sync_meta  : std_logic_vector(3 downto 0) := (others => '0');
@@ -35,14 +38,17 @@ architecture rtl of button_if is
     signal sample_count : integer range 0 to SAMPLE_DIV-1 := 0;
     signal sample_tick  : std_logic := '0';
 
-    signal events       : std_logic_vector(4 downto 0) := (others => '0');
+    signal events : std_logic_vector(4 downto 0) := (others => '0');
+
     signal left_hold_ms : integer range 0 to LONG_PRESS_MS-1 := 0;
     signal left_long_sent : std_logic := '0';
+
 begin
+
     events_o <= events;
 
-    -- Wejscia asynchroniczne: dwustopniowy synchronizator.
-    process (clk_i)
+    -- Synchronizator dwustopniowy
+    process(clk_i)
     begin
         if rising_edge(clk_i) then
             if rst_i = '1' then
@@ -55,8 +61,8 @@ begin
         end if;
     end process;
 
-    -- Impuls probkujacy 1 ms (100 MHz / 100000).
-    process (clk_i)
+    -- Impuls co 1 ms
+    process(clk_i)
     begin
         if rising_edge(clk_i) then
             if rst_i = '1' then
@@ -72,8 +78,8 @@ begin
         end if;
     end process;
 
-    -- Ka¿dy stan wejscia musi utrzymac sie przez DEBOUNCE_MS probek.
-    process (clk_i)
+    -- Filtracja drga? styków
+    process(clk_i)
     begin
         if rising_edge(clk_i) then
             if rst_i = '1' then
@@ -94,8 +100,8 @@ begin
         end if;
     end process;
 
-    -- Zdarzenia sa zatrzaskiwane, az PicoBlaze potwierdzi je zapisem maski.
-    process (clk_i)
+    -- Rejestr zdarze? przycisków
+    process(clk_i)
         variable ev : std_logic_vector(4 downto 0);
     begin
         if rising_edge(clk_i) then
@@ -107,11 +113,13 @@ begin
             else
                 ev := events and not clear_mask_i;
 
-                -- Krotkie BTNL jest generowane dopiero po puszczeniu przycisku.
+                -- BTNL: d?ugie naci?ni?cie i krótkie klikni?cie
                 if buttons_db(3) = '1' then
+
                     if buttons_q(3) = '0' then
                         left_hold_ms   <= 0;
                         left_long_sent <= '0';
+
                     elsif sample_tick = '1' and left_long_sent = '0' then
                         if left_hold_ms = LONG_PRESS_MS-1 then
                             ev(4) := '1';
@@ -120,17 +128,19 @@ begin
                             left_hold_ms <= left_hold_ms + 1;
                         end if;
                     end if;
+
                 else
                     if buttons_q(3) = '1' then
                         if left_long_sent = '0' then
                             ev(0) := '1';
                         end if;
                     end if;
+
                     left_hold_ms   <= 0;
                     left_long_sent <= '0';
                 end if;
 
-                -- BTNR, BTNU, BTND: jedno zdarzenie na naciœniêcie.
+                -- BTNR, BTNU, BTND: zdarzenie przy naci?ni?ciu
                 for i in 0 to 2 loop
                     if buttons_db(i) = '1' and buttons_q(i) = '0' then
                         ev(3-i) := '1';
@@ -142,4 +152,5 @@ begin
             end if;
         end if;
     end process;
+
 end rtl;

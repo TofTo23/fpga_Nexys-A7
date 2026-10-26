@@ -1,7 +1,3 @@
--- Sterownik czterocyfrowego wyswietlacza 7-segmentowego Basys 3.
--- digit_i(3:0) = prawa cyfra, digit_i(15:12) = lewa cyfra.
--- Anody i segmenty sa aktywne stanem niskim; led7_seg_o(7)=DP, (6:0)=G..A.
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
@@ -101,7 +97,7 @@ begin
             end case;
 
             if edit_i = '1' and chosen and blink_phase = '1' then
-                led7_seg_o <= x"FF"; -- migajaca cyfra wygaszona przez pol okresu
+                led7_seg_o <= x"FF";
             else
                 led7_seg_o <= hex_to_7seg(nibble);
             end if;

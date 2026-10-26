@@ -99,17 +99,14 @@ architecture rtl of top is
     signal mem_addrb : std_logic_vector(17 downto 0) := (others => '0');
     signal mem_doutb : std_logic_vector(0 downto 0);
 
-    -- Startup clear and manual clear.
     signal clear_busy  : std_logic := '1';
     signal clear_index : integer range 0 to FB_SIZE-1 := 0;
 
-    -- Draw-port & Pipeline registers
     signal draw_we_reg   : std_logic := '0';
     signal draw_addr_reg : unsigned(17 downto 0) := (others => '0');
     signal amp_a_reg     : signed(9 downto 0) := to_signed(64, 10);
     signal amp_b_reg     : signed(7 downto 0) := to_signed(20, 8);
 
-    -- Pipeline stage 1 & 2 signals for timing closure
     signal p1_valid : std_logic := '0';
     signal prod_x0  : signed(20 downto 0) := (others => '0');
     signal prod_x1  : signed(18 downto 0) := (others => '0');
@@ -120,7 +117,6 @@ architecture rtl of top is
     signal x_pix_s2 : signed(11 downto 0) := (others => '0');
     signal y_pix_s2 : signed(11 downto 0) := (others => '0');
 
-    -- Frequency tuning words
     signal f1_reg : unsigned(7 downto 0) := to_unsigned(1, 8);
     signal f2_reg : unsigned(7 downto 0) := to_unsigned(1, 8);
 
@@ -148,7 +144,6 @@ architecture rtl of top is
     signal sin0_hold : std_logic_vector(10 downto 0) := (others => '0');
 begin
 
-    -- VGA 640x480 timing. Pixel enable is 25 MHz from the 100 MHz input clock.
     process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -175,7 +170,6 @@ begin
     vsync_int <= '0' when (v_count >= V_ACTIVE + V_FRONT and
                            v_count <  V_ACTIVE + V_FRONT + V_SYNC) else '1';
 
-    -- Delay visibility, sync and RAM read address by one 100 MHz cycle.
     process(clk_i)
         variable x_local : unsigned(17 downto 0);
         variable y_local : unsigned(17 downto 0);
@@ -207,7 +201,6 @@ begin
     hsync_o <= hsync_d;
     vsync_o <= vsync_d;
 
-    -- Clear has priority over drawing.
     mem_wea(0) <= '1' when clear_busy = '1' else draw_we_reg;
     mem_addra  <= std_logic_vector(to_unsigned(clear_index, mem_addra'length))
                   when clear_busy = '1' else
@@ -252,7 +245,6 @@ begin
             event_s_config_tlast_unexpected => open
         );
 
-    -- Reconfigure both channels in order: channel 0 first, then channel 1 (TLAST=1).
     process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -274,7 +266,6 @@ begin
         end if;
     end process;
 
-    -- Button handling: BTNL=btn_i(3), BTNC=btn_i(2), BTNR=btn_i(1), BTND=btn_i(0).
     process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -308,7 +299,6 @@ begin
         end if;
     end process;
 
-    -- 3-Stage Pipelined Epitrochoid Calculation (solves timing issues at 100 MHz)
     process(clk_i)
         variable diff_x : signed(20 downto 0);
         variable diff_y : signed(20 downto 0);
@@ -324,7 +314,6 @@ begin
                 p2_valid       <= '0';
                 draw_we_reg    <= '0';
             else
-                -- STAGE 1: Latch DDS channels and multiply by amplitudes
                 p1_valid <= '0';
                 if dds_valid = '1' then
                     if have_channel_0 = '0' then
@@ -341,7 +330,6 @@ begin
                     end if;
                 end if;
 
-                -- STAGE 2: Subtract products, scale by 1024 (shift right 10) and offset by 192
                 p2_valid <= p1_valid;
                 if p1_valid = '1' then
                     diff_x   := prod_x0 - resize(prod_x1, 21);
@@ -350,7 +338,6 @@ begin
                     y_pix_s2 <= to_signed(192, 12) - resize(shift_right(diff_y, 10), 12);
                 end if;
 
-                -- STAGE 3: Clip bounds and compute RAM address using bit shifts (y*384 + x)
                 draw_we_reg <= '0';
                 if p2_valid = '1' then
                     if x_pix_s2 >= 0 and x_pix_s2 < FB_W and

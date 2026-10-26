@@ -1,13 +1,10 @@
--- Top-level projektu PicoBlaze dla Digilent Basys 3 (Artix-7, zegar 100 MHz).
--- Wymagane pliki z dystrybucji KCPSM6: kcpsm6.vhd oraz ROM wygenerowany z PSM.
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity top is
     port (
         clk_i      : in  std_logic;
-        rst_i      : in  std_logic; -- SW7, aktywny '1'
+        rst_i      : in  std_logic;
         button_i   : in  std_logic_vector(3 downto 0);
         led7_an_o  : out std_logic_vector(3 downto 0);
         led7_seg_o : out std_logic_vector(7 downto 0)
@@ -65,7 +62,7 @@ architecture rtl of top is
     signal edit_reg     : std_logic := '0';
     signal digit_bus    : std_logic_vector(15 downto 0);
 begin
-    -- Resetzsynchronizator: reset wejscia KCPSM6 pozostaje synchroniczny.
+ 
     process (clk_i)
     begin
         if rising_edge(clk_i) then
@@ -98,7 +95,6 @@ begin
             clk            => clk_i
         );
 
-    -- ROM generowana przez assembler KCPSM6 z pliku counter_editor.psm.
     program_rom : entity work.counter_editor
         generic map (
             C_FAMILY             => "7S",
@@ -113,7 +109,6 @@ begin
             clk         => clk_i
         );
 
-    -- Odczyt portu 00: zatrzasniete zdarzenia przyciskow.
     process (port_id, button_events)
     begin
         in_port <= x"00";
@@ -123,7 +118,6 @@ begin
         end case;
     end process;
 
-    -- Zapis maski odczytanych zdarzen do portu 20 potwierdza je w button_if.
     clear_mask <= out_port(4 downto 0)
                   when (write_strobe = '1' and port_id = x"20")
                   else (others => '0');
@@ -131,8 +125,8 @@ begin
     buttons : entity work.button_if
         generic map (
             CLK_HZ        => 100_000_000,
-            DEBOUNCE_MS   => 1, -- USTAW NA 10!!!!!!!!!
-            LONG_PRESS_MS => 10 -- USTAW NA 500
+            DEBOUNCE_MS   => 10,
+            LONG_PRESS_MS => 500
         )
         port map (
             clk_i        => clk_i,
@@ -142,7 +136,6 @@ begin
             events_o     => button_events
         );
 
-    -- Rejestry wyjsciowe mapowane na porty 10..14 PicoBlaze.
     process (clk_i)
     begin
         if rising_edge(clk_i) then
@@ -172,7 +165,7 @@ begin
 
     seven_segment_display : entity work.display
         generic map (
-            clk_div   => 100, -- 100_000
+            clk_div   => 100_000,
             blink_div => 25_000_000
         )
         port map (

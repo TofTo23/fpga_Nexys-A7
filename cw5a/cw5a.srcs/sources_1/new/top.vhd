@@ -1,16 +1,3 @@
-----------------------------------------------------------------------------------
--- Drukarka pseudograficzna RS-232 (IP Core Generator)
---
--- Odebrane znaki trafiaja do bufora FIFO (64 znaki, IP fifo_mem). Automat
--- pobiera je z FIFO do bufora linii; po 18 znakach lub po kodzie 13 (Enter)
--- drukuje linie z powrotem na TXD_o: 16 wierszy, kazdy znak jako 8 "pikseli"
--- (ksztalty z pamieci ROM, IP char_mem). Pikselem jest sam znak, a dla kodow
--- < 32 i > 127 gwiazdka. Po kazdym wierszu wysylane sa CR (13) i LF (10).
--- Na wyswietlaczu (AN1, AN0) widac ostatni odebrany kod, jak w "Monitorze RS-232".
--- LD0 zapala sie, gdy przyszedl znak, a FIFO bylo pelne (przepelnienie).
--- Bez resetu - stan poczatkowy ustalaja wartosci poczatkowe sygnalow.
-----------------------------------------------------------------------------------
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
@@ -26,14 +13,12 @@ end top;
 
 architecture Behavioral of top is
 
-    -- pamiec ROM z ksztaltami znakow (Block Memory Generator)
     component char_mem
         port ( clka  : in  std_logic;
                addra : in  std_logic_vector(11 downto 0);
                douta : out std_logic_vector(7 downto 0));
     end component;
 
-    -- bufor FIFO 64 x 8 bitow (FIFO Generator)
     component fifo_mem
         port ( clk   : in  std_logic;
                din   : in  std_logic_vector(7 downto 0);
@@ -44,9 +29,8 @@ architecture Behavioral of top is
                empty : out std_logic);
     end component;
 
-    constant SEG_OFF : std_logic_vector (7 downto 0) := "11111111";    -- cyfra wygaszona
+    constant SEG_OFF : std_logic_vector (7 downto 0) := "11111111";
 
-    -- dekoder: cyfra hex -> segmenty ABCDEFG + DP (aktywne '0')
     function hex2seg (hex : std_logic_vector (3 downto 0)) return std_logic_vector is
     begin
         case hex is
@@ -75,7 +59,6 @@ architecture Behavioral of top is
     constant SPACE    : std_logic_vector (7 downto 0) := x"20";
     constant STAR     : std_logic_vector (7 downto 0) := x"2A";
 
-    -- odbiornik i wyswietlacz
     signal rx_data  : std_logic_vector (7 downto 0);
     signal rx_valid : std_logic;
     signal digits   : std_logic_vector (31 downto 0);
@@ -111,10 +94,7 @@ architecture Behavioral of top is
     signal pix_char : std_logic_vector (7 downto 0);        -- znak uzywany jako piksel
 
 begin
-
-    ------------------------------------------------------------------------------
-    -- odbiornik RS-232 i wyswietlacz (monitor odebranych znakow)
-    ------------------------------------------------------------------------------
+    -- odbiornik RS-232 i wyswietlacz 
     rx : entity work.receiver
         generic map ( clk_freq => 100000000,
                       baud     => 9600 )
@@ -133,9 +113,7 @@ begin
                    led7_an_o  => led7_an_o,
                    led7_seg_o => led7_seg_o );
 
-    ------------------------------------------------------------------------------
-    -- bufor FIFO: kazdy odebrany znak jest zapisywany
-    ------------------------------------------------------------------------------
+    -- bufor FIFO
     fifo : fifo_mem
         port map ( clk   => clk_i,
                    din   => rx_data,
@@ -145,8 +123,7 @@ begin
                    full  => fifo_full,
                    empty => fifo_empty );
 
-    -- przepelnienie: przyszedl znak, a FIFO bylo pelne -> LD0 sie zapala;
-    -- gdy w FIFO zwolni sie miejsce (full = '0') -> LD0 gasnie
+    -- przepelnienie
     process (clk_i)
     begin
         if rising_edge(clk_i) then
@@ -160,9 +137,7 @@ begin
 
     ld0 <= overflow;
 
-    ------------------------------------------------------------------------------
-    -- pamiec ROM: adres = kod znaku & numer wiersza (0-15)
-    ------------------------------------------------------------------------------
+    -- pamiec ROM
     rom : char_mem
         port map ( clka  => clk_i,
                    addra => rom_addr,
@@ -170,13 +145,11 @@ begin
 
     rom_addr <= line_buf(col) & std_logic_vector(to_unsigned(row, 4));
 
-    -- piksel: sam znak, a dla kodow < 32 i > 127 gwiazdka
+    -- pikse
     pix_char <= STAR when unsigned(line_buf(col)) < 32 or unsigned(line_buf(col)) > 127
                 else line_buf(col);
 
-    ------------------------------------------------------------------------------
     -- nadajnik RS-232
-    ------------------------------------------------------------------------------
     tx : entity work.transmitter
         generic map ( clk_freq => 100000000,
                       baud     => 9600 )
@@ -186,11 +159,8 @@ begin
                    busy_o  => tx_busy,
                    txd_o   => TXD_o );
 
-    ------------------------------------------------------------------------------
-    -- automat: zbieranie linii z FIFO i drukowanie
-    ------------------------------------------------------------------------------
 
-    -- odczyt z FIFO: jeden takt w stanie COLLECT, gdy FIFO nie jest puste
+    -- odczyt z FIFO
     fifo_rd <= '1' when state = COLLECT and fifo_empty = '0' else '0';
 
     process (clk_i)
@@ -201,43 +171,42 @@ begin
 
             case state is
 
-                -- czekanie na znak w FIFO (odczyt: fifo_rd)
+                -- czekanie na znak w FIFo
                 when COLLECT =>
                     if fifo_empty = '0' then
                         state <= FIFO_DATA;
                     end if;
 
-                -- znak z FIFO jest juz na fifo_dout (opoznienie odczytu 1 takt)
+                -- znak z FIFO
                 when FIFO_DATA =>
                     col <= 0;
                     row <= 0;
                     if fifo_dout = CR then
                         if n_chars > 0 then
-                            state <= ROM_WAIT;          -- Enter: drukuj linie
+                            state <= ROM_WAIT;          -- Enter
                         else
-                            state <= COLLECT;           -- pusta linia: nic do druku
+                            state <= COLLECT;           -- pusta lini
                         end if;
                     else
                         line_buf(n_chars) <= fifo_dout;
                         n_chars <= n_chars + 1;
                         if n_chars = LINE_LEN - 1 then
-                            state <= ROM_WAIT;          -- 18 znakow: drukuj linie
+                            state <= ROM_WAIT;          -- 18 znakow
                         else
                             state <= COLLECT;
                         end if;
                     end if;
 
-                -- ROM zapamietuje adres (opoznienie odczytu 1 takt)
+                -- ROM zapamietuje adres
                 when ROM_WAIT =>
                     state <= ROM_DATA;
 
-                -- wiersz ksztaltu znaku jest juz na rom_dout
                 when ROM_DATA =>
                     pixels <= rom_dout;
                     pix_no <= 0;
                     state  <= SEND_PIX;
 
-                -- wyslanie 8 pikseli wiersza, od lewego (bit 7)
+                -- wyslanie 8 pikseli wiersza
                 when SEND_PIX =>
                     if tx_busy = '0' and tx_start = '0' then
                         if pixels(7) = '1' then
@@ -259,7 +228,6 @@ begin
                         end if;
                     end if;
 
-                -- koniec wiersza: CR
                 when SEND_CR =>
                     if tx_busy = '0' and tx_start = '0' then
                         tx_data  <= CR;
@@ -267,7 +235,6 @@ begin
                         state    <= SEND_LF;
                     end if;
 
-                -- koniec wiersza: LF, potem nastepny wiersz albo koniec linii
                 when SEND_LF =>
                     if tx_busy = '0' and tx_start = '0' then
                         tx_data  <= LF;

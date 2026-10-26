@@ -1,9 +1,3 @@
-; Licznik/edytor czterech cyfr szesnastkowych dla KCPSM6 (PicoBlaze).
-; Port wejściowy 00: bity 0..4 = zdarzenia BTNL-short, BTNR, BTNU, BTND, BTNL-long.
-; Porty wyjściowe 10..13: cyfry 0..3 (0 = prawa cyfra), niska połówka bajtu.
-; Port 14: bity 1..0 = wybrana cyfra, bit 2 = tryb edycji.
-; Port 20: maska bitów zdarzeń do potwierdzenia.
-
 NAMEREG s0, digit0
 NAMEREG s1, digit1
 NAMEREG s2, digit2
@@ -13,7 +7,7 @@ NAMEREG s5, mode
 NAMEREG s6, events
 NAMEREG s7, ctrl
 
-; Uruchomienie: 0000, tryb wyswietlania, wybrana prawa cyfra.
+; tryb wyswietlania
 start:
     LOAD digit0, 00
     LOAD digit1, 00
@@ -30,13 +24,11 @@ start:
 main_loop:
     INPUT events, 00
 
-    ; Dlugie BTNL: wejscie/wyjscie z trybu edycji.
     TEST events, 10
     JUMP Z, scan_left
     CALL toggle_edit
 
 scan_left:
-    ; Krotkie BTNL: wybor cyfry bardziej w lewo (tylko w trybie edycji).
     TEST events, 01
     JUMP Z, scan_right
     CALL left_short
@@ -66,8 +58,6 @@ acknowledge:
     OUTPUT events, 20
     JUMP main_loop
 
-; -----------------------------------------------------------------------------
-; Zmiana trybu. Po wejsciu do edycji aktywna jest prawa cyfra.
 toggle_edit:
     COMPARE mode, 00
     JUMP Z, enter_edit
@@ -80,7 +70,6 @@ enter_edit:
     CALL write_ctrl
     RETURN
 
-; Krotkie BTNL przesuwa zaznaczenie w lewo, z zawijaniem 3 -> 0.
 left_short:
     COMPARE mode, 00
     JUMP Z, left_done
@@ -93,7 +82,6 @@ left_update:
 left_done:
     RETURN
 
-; BTNR przesuwa zaznaczenie w prawo, z zawijaniem 0 -> 3.
 right_press:
     COMPARE mode, 00
     JUMP Z, right_done
