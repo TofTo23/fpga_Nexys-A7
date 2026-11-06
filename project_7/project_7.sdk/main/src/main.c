@@ -1,45 +1,10 @@
-/*
- * main.c
- *
- *  Created on: Oct 26, 2026
- *      Author: lucek
- */
-
-/*
- * ============================================================================
- *  Kalkulator RPN (wzorzec: HP-12C) na procesorze MicroBlaze
- *  Vivado / Xilinx SDK 2019.x  -  aplikacja standalone
- *
- *  Peryferia:
- *    - AXI UartLite      : wejscie znakow z portu RS232 (9600, 8N1)
- *    - AXI GPIO (8 bit)  : anody wyswietlaczy 7-segmentowych (AN0..AN7)
- *    - AXI GPIO (8 bit)  : segmenty (a,b,c,d,e,f,g,dp)
- *    - AXI GPIO (>=3 bit): diody LED (LD2=Y, LD1=Z, LD0=T)
- *
- *  Klawisze (znaki wysylane z terminala, np. putty):
- *    0..9     - wprowadzanie cyfr
- *    +  -  *  /   - dzialania arytmetyczne (wynik = Y op X)
- *    S        - CHS  (zmiana znaku rejestru X)
- *    ENTER    - wprowadzenie X na stos (podniesienie stosu)
- *    C        - CLx  (zerowanie X, kasowanie bledu)
- *    X        - X<->Y (zamiana X i Y)
- *    R        - R(dol) (rotacja stosu w dol, X -> T)
- *    ,        - zmniejszenie jasnosci wyswietlacza o 1 krok
- *    .        - zwiekszenie jasnosci wyswietlacza o 1 krok
- * ============================================================================
- */
-
 #include <stdint.h>
 #include "xparameters.h"
 #include "xgpio.h"
 #include "xuartlite.h"
 #include "xil_printf.h"
 
-/* ===========================================================================
- *  1. KONFIGURACJA SPRZETOWA  --  TO TRZEBA DOPASOWAC DO WLASNEGO BLOCK DESIGN
- *     (sprawdz nazwy w pliku xparameters.h w projekcie BSP)
- * ===========================================================================
- */
+/* konfiguracja sprzetowa */
 
 #define UART_DEVICE_ID        XPAR_UARTLITE_0_DEVICE_ID
 
@@ -55,45 +20,28 @@
 #define GPIO_LED_DEVICE_ID    XPAR_AXI_GPIO_1_DEVICE_ID
 #define GPIO_LED_CHANNEL      1
 
-/* Polaryzacja sygnalow (plytki Digilent Nexys: anody i segmenty aktywne w 0) */
+/* Polaryzacja sygnalow  */
 #define SEG_ACTIVE_LOW        1
 #define AN_ACTIVE_LOW         1
 #define LED_ACTIVE_LOW        0
 
-/* 1 = bit 0 portu anod steruje SKRAJNIE PRAWYM wyswietlaczem (typowe: AN0)
- * 0 = bit 0 steruje skrajnie lewym (gdy anody sa podlaczone odwrotnie)      */
+/* 1 = bit 0 portu anod steruje SKRAJNIE PRAWYM wyswietlaczem
+ * 0 = bit 0 steruje skrajnie lewym */
 #define AN_BIT0_IS_RIGHT      1
 
-/* Czestotliwosc zegara MicroBlaze - uzywana tylko do petli opozniajacej.
- * Dokladnosc nie jest krytyczna (patrz delay_us).                          */
+/* Czestotliwosc zegara MicroBlaze */
 #define CPU_FREQ_HZ           100000000UL
 #define LOOP_CYCLES           7UL     /* ~cykli na obrot petli opozniajacej  */
 
-/* Echo odebranego znaku z powrotem do terminala (putty nie ma echa lokalnego) */
+/* Echo odebranego znaku z powrotem do terminala */
 #define ECHO_UART             1
 
-/* ===========================================================================
- *  2. PARAMETRY WYSWIETLANIA I JASNOSCI
- * ===========================================================================
- */
+// param wyswietlania
 
 #define NDIGITS               8          /* liczba wyswietlaczy              */
 #define MAX_ENTRY_VALUE       9999999L   /* 7 pozycji na liczbe              */
+#define DIGIT_ON_US           250        /* czas wyswietlania jednej pozycji */
 
-#define BRIGHT_LEVELS         16         /* liczba krokow regulacji jasnosci */
-#define BRIGHT_DEFAULT        12
-#define SLOT_UNIT_US          25         /* kwant czasu jednego kroku [us]   */
-/* Czas jednej pozycji = BRIGHT_LEVELS * SLOT_UNIT_US = 400 us
- * Odswiezanie calego wyswietlacza = 8 * 400 us = 3.2 ms  ->  ok. 310 Hz
- * Z czasu pozycji "level" krokow swieci, a (BRIGHT_LEVELS-level) jest ciemne
- * (wszystkie anody wylaczone) - stad regulacja jasnosci bez zmiany czestotliwosci. */
-
-/* ===========================================================================
- *  3. KODY SEGMENTOW
- *     bit0=a, bit1=b, bit2=c, bit3=d, bit4=e, bit5=f, bit6=g, bit7=dp
- *     (1 = segment ma swiecic; polaryzacja dokladana jest w segWrite())
- * ===========================================================================
- */
 
 static const uint8_t SEG_DIGIT[10] = {
     0x3F, /* 0 */  0x06, /* 1 */  0x5B, /* 2 */  0x4F, /* 3 */  0x66, /* 4 */
@@ -101,45 +49,30 @@ static const uint8_t SEG_DIGIT[10] = {
 };
 
 #define SEG_BLANK   0x00
-#define SEG_MINUS   0x40    /* g            */
-#define SEG_E       0x79    /* a d e f g    */
-#define SEG_r       0x50    /* e g          */
-#define SEG_o       0x5C    /* c d e g      */
+#define SEG_MINUS   0x40    
+#define SEG_E       0x79    
+#define SEG_r       0x50    
+#define SEG_o       0x5C    
 
-/* ===========================================================================
- *  4. ZMIENNE GLOBALNE
- * ===========================================================================
- */
 
 static XGpio      gpioSeg, gpioAn, gpioLed;
 static XUartLite  uart;
 
-/* Stos RPN */
 static int32_t regX, regY, regZ, regT;
 
-static int  entering;       /* trwa wprowadzanie liczby z klawiatury   */
-static int  entryNeg;       /* wprowadzana liczba ma znak minus        */
-static int  stackLift;      /* nastepna liczba ma podniesc stos        */
-static int  errorFlag;      /* stan bledu - na wyswietlaczu "Error"    */
-
-static int  brightness = BRIGHT_DEFAULT;    /* 1 .. BRIGHT_LEVELS      */
+static int  entering;       
+static int  entryNeg;       
+static int  stackLift;      
+static int  errorFlag;      
 
 /* Bufor obrazu: indeks 0 = skrajnie prawa pozycja, 7 = skrajnie lewa  */
 static uint8_t dispBuf[NDIGITS];
 
-/* ===========================================================================
- *  5. FUNKCJE NISKOPOZIOMOWE
- * ===========================================================================
- */
 
-/* Prosta petla opozniajaca. Dla regulacji jasnosci istotny jest stosunek
- * czasow, a nie bezwzgledna wartosc - jesli wyswietlacz migocze, zmniejsz
- * SLOT_UNIT_US, jesli jest za ciemny przy maksimum - zwieksz LOOP_CYCLES. */
 static void delay_us(uint32_t us)
 {
     volatile uint32_t n = (uint32_t)(((uint64_t)us * (CPU_FREQ_HZ / 1000000UL)) / LOOP_CYCLES);
     while (n--) {
-        /* pusto */
     }
 }
 
@@ -170,10 +103,6 @@ static void ledWrite(uint8_t value)
 #endif
 }
 
-/* ===========================================================================
- *  6. PRZYGOTOWANIE OBRAZU
- * ===========================================================================
- */
 
 static void updateLeds(void)
 {
@@ -189,7 +118,6 @@ static void updateDisplay(void)
     int i;
 
     if (errorFlag) {
-        /* obraz (od lewej):  _ E r r o r _ _  */
         dispBuf[7] = SEG_BLANK;
         dispBuf[6] = SEG_E;
         dispBuf[5] = SEG_r;
@@ -201,32 +129,24 @@ static void updateDisplay(void)
     } else {
         uint32_t m = (regX < 0) ? (uint32_t)(-(int64_t)regX) : (uint32_t)regX;
 
-        /* 7 mlodszych pozycji: wartosc bezwzgledna rejestru X */
         for (i = 0; i < NDIGITS - 1; i++) {
             dispBuf[i] = SEG_DIGIT[m % 10];
             m /= 10;
         }
-        /* wygaszenie zer nieznaczacych (pozycja 0 zawsze widoczna) */
         m = (regX < 0) ? (uint32_t)(-(int64_t)regX) : (uint32_t)regX;
         for (i = NDIGITS - 2; i >= 1; i--) {
             uint32_t div = 1;
             int k;
             for (k = 0; k < i; k++) div *= 10;
             if (m / div == 0) dispBuf[i] = SEG_BLANK;
-            else break;                      /* dalej sa juz cyfry znaczace */
+            else break;                      
         }
 
-        /* najstarsza pozycja: znak minus */
         dispBuf[7] = ((regX < 0) || (entering && entryNeg)) ? SEG_MINUS : SEG_BLANK;
     }
 
     updateLeds();
 }
-
-/* ===========================================================================
- *  7. LOGIKA KALKULATORA RPN
- * ===========================================================================
- */
 
 static void stackLiftUp(void)       /* podniesienie stosu: T<-Z, Z<-Y, Y<-X */
 {
@@ -235,11 +155,10 @@ static void stackLiftUp(void)       /* podniesienie stosu: T<-Z, Z<-Y, Y<-X */
     regY = regX;
 }
 
-static void stackDrop(void)         /* zdjecie: Y<-Z, Z<-T, T bez zmian     */
+static void stackDrop(void)         /* zdjecie: Y<-Z, Z<-T  */
 {
     regY = regZ;
     regZ = regT;
-    /* regT celowo pozostaje bez zmian - tak dziala HP-12C */
 }
 
 static void setError(void)
@@ -258,12 +177,12 @@ static void keyDigit(int d)
         regX      = 0;
         entering  = 1;
         entryNeg  = 0;
-        stackLift = 1;          /* po zakonczeniu wpisu stos bedzie podnoszony */
+        stackLift = 1;          
     }
 
     m = (regX < 0) ? -(int64_t)regX : (int64_t)regX;
     m = m * 10 + d;
-    if (m > MAX_ENTRY_VALUE) return;        /* wiecej niz 7 cyfr - ignoruj   */
+    if (m > MAX_ENTRY_VALUE) return;        /* wiecej niz 7 cyfr - ignoruj*/
 
     regX = (int32_t)(entryNeg ? -m : m);
 }
@@ -273,7 +192,7 @@ static void keyEnter(void)
     entering = 0;
     entryNeg = 0;
     stackLiftUp();
-    stackLift = 0;              /* po ENTER kolejna liczba NIE podnosi stosu */
+    stackLift = 0;              
 }
 
 static void keyClx(void)
@@ -341,17 +260,7 @@ static void keyOperation(char op)
     stackLift = 1;
 }
 
-static void keyBrightness(int delta)
-{
-    brightness += delta;
-    if (brightness < 1)             brightness = 1;
-    if (brightness > BRIGHT_LEVELS) brightness = BRIGHT_LEVELS;
-}
-
-/* ===========================================================================
- *  8. OBSLUGA ZNAKOW Z RS232
- * ===========================================================================
- */
+// RS232
 
 static void handleChar(uint8_t c)
 {
@@ -360,11 +269,6 @@ static void handleChar(uint8_t c)
     else                        { XUartLite_SendByte(uart.RegBaseAddress, c); }
 #endif
 
-    /* Regulacja jasnosci dziala takze w stanie bledu */
-    if (c == ',') { keyBrightness(-1); return; }
-    if (c == '.') { keyBrightness(+1); return; }
-
-    /* W stanie bledu reaguje wylacznie klawisz CLx */
     if (errorFlag) {
         if (c == 'C' || c == 'c') {
             keyClx();
@@ -396,7 +300,7 @@ static void handleChar(uint8_t c)
             keyRollDown();
             break;
         default:
-            return;             /* nieznany znak - ignorowany */
+            return;           
         }
     }
 
@@ -411,16 +315,10 @@ static void uartPoll(void)
     }
 }
 
-/* ===========================================================================
- *  9. ODSWIEZANIE WYSWIETLACZA (multipleksowanie + regulacja jasnosci)
- * ===========================================================================
- */
-
+// wyswietlacz
 static void displayRefresh(void)
 {
     int i;
-    uint32_t tOn  = (uint32_t)brightness * SLOT_UNIT_US;
-    uint32_t tOff = (uint32_t)(BRIGHT_LEVELS - brightness) * SLOT_UNIT_US;
 
     for (i = 0; i < NDIGITS; i++) {
 #if AN_BIT0_IS_RIGHT
@@ -428,22 +326,17 @@ static void displayRefresh(void)
 #else
         uint8_t anMask = (uint8_t)(1u << (NDIGITS - 1 - i));
 #endif
-        anWrite(0x00);              /* gaszenie anod przed zmiana segmentow */
+        anWrite(0x00);              
         segWrite(dispBuf[i]);
         anWrite(anMask);
-        delay_us(tOn);
+        delay_us(DIGIT_ON_US);
 
-        anWrite(0x00);              /* okres ciemny - regulacja jasnosci    */
-        if (tOff) delay_us(tOff);
-
-        uartPoll();                 /* odpytanie UART co ok. 400 us         */
+        anWrite(0x00);              
+        uartPoll();                 
     }
 }
 
-/* ===========================================================================
- * 10. INICJALIZACJA I PETLA GLOWNA
- * ===========================================================================
- */
+
 
 int main(void)
 {
@@ -460,7 +353,7 @@ int main(void)
     status = XGpio_Initialize(&gpioLed, GPIO_LED_DEVICE_ID);
     if (status != XST_SUCCESS) return XST_FAILURE;
 
-    XGpio_SetDataDirection(&gpioSeg, GPIO_SEG_CHANNEL, 0x00000000);  /* wyjscia */
+    XGpio_SetDataDirection(&gpioSeg, GPIO_SEG_CHANNEL, 0x00000000);  
     XGpio_SetDataDirection(&gpioAn,  GPIO_AN_CHANNEL,  0x00000000);
     XGpio_SetDataDirection(&gpioLed, GPIO_LED_CHANNEL, 0x00000000);
 
@@ -475,7 +368,7 @@ int main(void)
     updateDisplay();
 
     xil_printf("\r\nKalkulator RPN (MicroBlaze) - gotowy.\r\n");
-    xil_printf("0-9 +-*/ ENTER C(CLx) S(CHS) X(X<>Y) R(roll) , . (jasnosc)\r\n");
+    xil_printf("0-9 +-*/ ENTER C(CLx) S(CHS) X(X<>Y) R(roll)\r\n");
 
     for (;;) {
         displayRefresh();
